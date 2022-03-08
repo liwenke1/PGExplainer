@@ -4,6 +4,7 @@ import time
 import torch
 from tqdm import tqdm
 from models import GnnNets, GnnNets_NC
+from models.Devign import DevignModel, config_model
 from utils import PlotUtils
 from pgexplainer import PGExplainer
 from torch_geometric.data import Data
@@ -27,6 +28,7 @@ def pipeline_GC(top_k):
         data_indices = loader['test'].dataset.indices
         pgexplainer_trainset = loader['train'].dataset
 
+    ''' load model 
     input_dim = dataset.num_node_features
     output_dim = dataset.num_classes
     gnnNets = GnnNets(input_dim, output_dim, model_args)
@@ -34,6 +36,10 @@ def pipeline_GC(top_k):
     gnnNets.update_state_dict(checkpoint['net'])
     gnnNets.to_device()
     gnnNets.eval()
+    '''
+
+    Devign = DevignModel(max_edge_types=model_args.max_edge_types)
+    config_model(Devign, model_args)
 
     save_dir = os.path.join('./results', f"{data_args.dataset_name}_"
                                          f"{model_args.model_name}_"
@@ -41,7 +47,7 @@ def pipeline_GC(top_k):
     if not os.path.isdir(save_dir):
         os.mkdir(save_dir)
 
-    pgexplainer = PGExplainer(gnnNets)
+    pgexplainer = PGExplainer(Devign)
 
     if torch.cuda.is_available():
         torch.cuda.synchronize()
@@ -84,7 +90,7 @@ def pipeline_GC(top_k):
 
         graph = to_networkx(data)
 
-        fidelity_score = top_k_fidelity(data, edge_mask, top_k, gnnNets, pred_label)
+        fidelity_score = top_k_fidelity(data, edge_mask, top_k, Devign, pred_label)
         sparsity_score = top_k_sparsity(data, edge_mask, top_k)
 
         fidelity_score_list.append(fidelity_score)

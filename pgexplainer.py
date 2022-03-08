@@ -47,7 +47,7 @@ class PGExplainer(nn.Module):
         self.elayers.append(nn.Linear(64, 1))
         self.elayers.to(self.device)
         self.ckpt_path = os.path.join('./checkpoint', data_args.dataset_name,
-                                      f'PGE_generator_{model_args.model_name}.pth')
+                                      f'PGE_generator_{model_args.model_name}.ckpt')
 
     def __set_masks__(self, x, edge_index, edge_mask=None, init="normal"):
         """ Set the weights for message passing """

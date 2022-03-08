@@ -3,6 +3,7 @@ import glob
 import json
 import torch
 import pickle
+import random
 import numpy as np
 import os.path as osp
 from Configures import data_args
@@ -35,6 +36,32 @@ def split(data, batch):
     slices['edge_index'] = edge_slice
     slices['y'] = torch.arange(0, batch[-1] + 2, dtype=torch.long)
     return data, slices
+
+
+def read_json(filename):
+    #读取文件
+    with open(filename,'r') as f:
+        file = json.load(f)
+    #文件内容读取到torch.tensor()中
+    x = torch.tensor(file['node_features'],dtype=torch.float64)
+
+    edge_index_list = []
+    for edge in file['graph']:
+        edge_index_list.append([edge[0],edge[2]])
+    edge_index = torch.tensor(edge_index_list,dtype=torch.long).t()
+    
+    edge_attr_list = []
+    for edge in file['graph']:
+        edge_attr_list.append([edge[1]])
+    edge_attr = torch.tensor(edge_attr_list)
+
+    y=[]
+    y.append([file['target']])
+    y=torch.tensor(y)
+    
+    data=Data(x=x,edge_index=edge_index,edge_attr=edge_attr,y=y)
+    #torch.save(data,filename+'.pt')
+    return data
 
 
 def read_file(folder, prefix, name):
@@ -119,6 +146,8 @@ def get_dataset(data_args):
         return load_MolecueNet(data_args)
     elif data_args.dataset_name.lower() in sentigraph_names:
         return load_SeniGraph(data_args)
+    elif data_args.dataset_name.lower() == 'devign':
+        return load_Devign(data_args)
     else:
         raise NotImplementedError
 
@@ -298,6 +327,40 @@ class BA2MotifDataset(InMemoryDataset):
         torch.save(self.collate(data_list), self.processed_paths[0])
 
 
+class Devign(InMemoryDataset):
+    def __init__(self, root, name, transform=None, pre_transform=None):
+        self.name = name
+        super(Devign, self).__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def processed_file_names(self):
+        return [f'Devign.pt']
+
+    def process(self):
+        data_list = []
+        
+        # json -> data_list
+        dataset_path=['/home/devign_out/devign_out_ff_novul/','/home/devign_out/devign_out_ff_vul/',
+                   '/home/devign_out/devign_out_qu_novul/','/home/devign_out/devign_out_qu_vul/']
+        for path in dataset_path:
+            dataset_list = glob.glob(path + '*.json')
+            random.shuffle(dataset_list)
+            i = 0
+            for data_name in dataset_list:
+                i += 1
+                if i>7:
+                    break
+                data = read_json(data_name)
+                if(data.num_nodes >= 15):
+                    data_list.append(data)
+                else:
+                    i -=1
+
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_paths[0])
+
+
 def load_MUTAG(data_args):
     """ 188 molecules where label = 1 denotes mutagenic effect """
     dataset = MUTAGDataset(root=data_args.dataset_dir, name=data_args.dataset_name)
@@ -329,6 +392,15 @@ def load_MolecueNet(data_args):
 
 def load_SeniGraph(data_args):
     dataset = SentiGraphDataset(root=data_args.dataset_dir, name=data_args.dataset_name)
+    return dataset
+
+
+def load_Devign(data_args):
+    """ Load Devign dataset"""
+    dataset = Devign(root=data_args.dataset_dir, name=data_args.dataset_name)
+    dataset.data.x = dataset.data.x.float()
+    dataset.node_type_dict = None
+    dataset.node_color = None
     return dataset
 
 

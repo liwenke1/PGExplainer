@@ -5,8 +5,8 @@ from typing import List
 
 
 class DataParser(Tap):
-    dataset_name: str = 'bbbp'
-    dataset_dir: str = '../datasets'
+    dataset_name: str = 'devign'
+    dataset_dir: str = './datasets'
     random_split: bool = True
     data_split_ratio: List = [0.8, 0.1, 0.1]   # the ratio of training, validation and testing set for random split
     seed: int = 1
@@ -33,6 +33,7 @@ class ModelParser(GATParser):
     adj_normlize: bool = True                 # the edge_weight normalization for gcn conv
     emb_normlize: bool = False                # the l2 normalization after gnn layer
     model_path: str = ""                      # default path to save the model
+    max_edge_types: int = 2                   # max edge type
 
     def process_args(self) -> None:
         # self.device = torch.device('cpu')
@@ -44,12 +45,12 @@ class ModelParser(GATParser):
         if not self.model_path:
             self.model_path = os.path.join(self.checkpoint,
                                            DataParser().parse_args(known_only=True).dataset_name,
-                                           f"{self.model_name}_best.pth")
+                                           f"{self.model_name}_best.ckpt")
 
 
 class TrainParser(Tap):
     learning_rate: float = 0.005
-    batch_size: int = 64
+    batch_size: int = 8
     weight_decay: float = 0.0
     max_epochs: int = 800
     save_epoch: int = 10
