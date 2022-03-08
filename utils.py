@@ -5,6 +5,17 @@ import rdkit.Chem as Chem
 import matplotlib.pyplot as plt
 from torch_geometric.utils.num_nodes import maybe_num_nodes
 from textwrap import wrap
+from dgl import DGLGraph
+
+def type_conversion(x, edge_index, edge_attr):
+    graph = DGLGraph()
+    x=x.cpu()
+    graph.add_nodes(len(x), data={'features': torch.FloatTensor(x)})
+    edge_index_list = edge_index.cpu().t().numpy().tolist()
+    edge_attr_list = edge_attr.cpu().numpy().tolist()
+    for i in range(len(edge_index_list)):
+        graph.add_edges(edge_index_list[i][0], edge_index_list[i][1], data={'etype': torch.LongTensor([edge_attr_list[i][0]])})
+    return graph
 
 def k_hop_subgraph_with_default_whole_graph(node_idx, num_hops,
     edge_index, relabel_nodes=False, num_nodes=None, flow='source_to_target'):
@@ -188,6 +199,15 @@ class PlotUtils():
                            for k, v in element_idxs.items()}
             node_color = ['#29A329', 'lime', '#F0EA00',  'maroon', 'brown', '#E49D1C', '#4970C6', '#FF5357']
             colors = [node_color[(v - 1) % len(node_color)] for k, v in node_idxs.items()]
+        
+        elif self.dataset_name == 'devign':
+            element_idxs = {k: int(v) for k, v in enumerate(x[:, 0])}
+            node_idxs = element_idxs
+            node_labels = {k: Chem.PeriodicTable.GetElementSymbol(Chem.GetPeriodicTable(), int(v))
+                           for k, v in element_idxs.items()}
+            node_color = ['#29A329', 'lime', '#F0EA00',  'maroon', 'brown', '#E49D1C', '#4970C6', '#FF5357']
+            colors = [node_color[(v - 1) % len(node_color)] for k, v in node_idxs.items()]
+
         else:
             raise NotImplementedError
 
@@ -254,7 +274,7 @@ class PlotUtils():
             nodelist, edgelist = self.get_topk_edges_subgraph(edge_index, edge_mask, top_k, un_directed)
             self.plot_ba2motifs(graph, nodelist, edgelist, figname=figname)
 
-        elif self.dataset_name.lower() in ['bbbp', 'mutag']:
+        elif self.dataset_name.lower() in ['bbbp', 'mutag', 'devign']:
             x = kwargs.get('x')
             nodelist, edgelist = self.get_topk_edges_subgraph(edge_index, edge_mask, top_k, un_directed)
             self.plot_molecule(graph, nodelist, x, edgelist, figname=figname)
@@ -269,5 +289,6 @@ class PlotUtils():
             words = kwargs.get('words')
             nodelist, edgelist = self.get_topk_edges_subgraph(edge_index, edge_mask, top_k, un_directed)
             self.plot_sentence(graph, nodelist, words=words, edgelist=edgelist, figname=figname)
+        
         else:
             raise NotImplementedError

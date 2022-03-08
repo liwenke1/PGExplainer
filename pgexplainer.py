@@ -12,9 +12,9 @@ from tqdm import tqdm
 import networkx as nx
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import to_networkx
-from PGExplainer.utils import k_hop_subgraph_with_default_whole_graph
-from PGExplainer.Configures import model_args, data_args, explainer_args
-
+from utils import k_hop_subgraph_with_default_whole_graph, type_conversion
+from Configures import model_args, data_args, explainer_args
+from dgl import DGLGraph
 EPS = 1e-6
 
 
@@ -41,6 +41,8 @@ class PGExplainer(nn.Module):
             input_feature = model_args.gat_heads * model_args.gat_hidden * 2
         elif model_args.concate:
             input_feature = int(torch.Tensor(model_args.latent_dim).sum()) * 2
+        elif model_args.model_name == 'devign':
+            input_feature = 100 * 2
         else:
             input_feature = model_args.latent_dim[-1] * 2
         self.elayers.append(nn.Sequential(nn.Linear(input_feature, 64), nn.ReLU()))
@@ -131,7 +133,7 @@ class PGExplainer(nn.Module):
         return gate_inputs
 
     def forward(self, inputs, training=None):
-        x, embed, edge_index, tmp = inputs
+        x, embed, edge_index, tmp, edge_attr= inputs
         nodesize = embed.shape[0]
         feature_dim = embed.shape[1]
         f1 = embed.unsqueeze(1).repeat(1, nodesize, 1).reshape(-1, feature_dim)
@@ -154,12 +156,13 @@ class PGExplainer(nn.Module):
         self.__set_masks__(x, edge_index, edge_mask)
 
         # the model prediction with edge mask
-        data = Batch.from_data_list([Data(x=x, edge_index=edge_index)])
-        data.to(self.device)
-        outputs = self.model(data)
+        #data = Batch.from_data_list([Data(x=x, edge_index=edge_index)])
+        #data.to(self.device)
+        graph = type_conversion(x, edge_index, edge_attr)
+        outputs = self.model(graph, cuda=True)
         return outputs[1].squeeze(), edge_mask
 
-    def get_model_output(self, x, edge_index, edge_mask=None, **kwargs):
+    def get_model_output(self, x, edge_index, edge_attr, edge_mask=None, **kwargs):
         """ return the model outputs with or without (w/wo) edge mask  """
         self.model.eval()
         self.__clear_masks__()
@@ -167,9 +170,10 @@ class PGExplainer(nn.Module):
             self.__set_masks__(x, edge_index, edge_mask.to(self.device))
 
         with torch.no_grad():
-            data = Batch.from_data_list([Data(x=x, edge_index=edge_index)])
-            data.to(self.device)
-            outputs = self.model(data)
+            #data = Batch.from_data_list([Data(x=x, edge_index=edge_index, edge_attr=edge_attr)])
+            #data.to(self.device)
+            graph = type_conversion(x, edge_index, edge_attr)
+            outputs = self.model(graph, cuda=True)
 
         self.__clear_masks__()
         return outputs
@@ -190,7 +194,7 @@ class PGExplainer(nn.Module):
             self.model.eval()
             for gid in tqdm(dataset_indices):
                 data = dataset[gid]
-                _, prob, emb = self.get_model_output(data.x, data.edge_index)
+                _, prob, emb = self.get_model_output(data.x, data.edge_index, data.edge_attr)
                 emb_dict[gid] = emb.data.cpu()
                 ori_pred_dict[gid] = prob.argmax(-1).data.cpu()
 
@@ -204,7 +208,7 @@ class PGExplainer(nn.Module):
             tic = time.perf_counter()
             for gid in tqdm(dataset_indices):
                 data = dataset[gid]
-                prob, _ = self.forward((data.x, emb_dict[gid], data.edge_index, tmp), training=True)
+                prob, _ = self.forward((data.x, emb_dict[gid], data.edge_index, tmp, data.edge_attr), training=True)
                 loss_tmp = self.__loss__(prob, ori_pred_dict[gid])
                 loss_tmp.backward()
                 loss += loss_tmp.item()
@@ -227,17 +231,17 @@ class PGExplainer(nn.Module):
         else:
             self.train_NC_explanation_network(dataset)
 
-    def eval_probs(self, x: torch.Tensor, edge_index: torch.Tensor,
-                   edge_mask: torch.Tensor=None, **kwargs) -> None:
-        outputs = self.get_model_output(x, edge_index, edge_mask=edge_mask)
+    def eval_probs(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor,
+                    edge_mask: torch.Tensor=None, **kwargs) -> None:
+        outputs = self.get_model_output(x, edge_index, edge_attr, edge_mask=edge_mask)
         return outputs[1].squeeze()
 
-    def explain_edge_mask(self, x, edge_index, **kwargs):
-        data = Batch.from_data_list([Data(x=x, edge_index=edge_index)])
+    def explain_edge_mask(self, x, edge_index, edge_attr, **kwargs):
+        data = Batch.from_data_list([Data(x=x, edge_index=edge_index, edge_attr=edge_attr)])
         data = data.to(self.device)
         with torch.no_grad():
-            _, prob, emb = self.get_model_output(data.x, data.edge_index)
-            _, edge_mask = self.forward((data.x, emb, data.edge_index, 1.0), training=False)
+            _, prob, emb = self.get_model_output(data.x, data.edge_index, data.edge_attr)
+            _, edge_mask = self.forward((data.x, emb, data.edge_index, 1.0, data.edge_attr), training=False)
         return edge_mask
 
     def get_subgraph(self, node_idx, x, edge_index, y, **kwargs):

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from torch_geometric.data import Data, Batch
 from typing import Optional
-
+from utils import type_conversion
 
 def calculate_selected_nodes(data, edge_mask, top_k, node_idx=None):
     threshold = float(edge_mask.reshape(-1).sort(descending=True).values[min(top_k, edge_mask.shape[0]-1)])
@@ -19,7 +19,7 @@ def calculate_selected_nodes(data, edge_mask, top_k, node_idx=None):
 
 
 def top_k_fidelity(data: Data, edge_mask: np.array, top_k: int,
-                   gnnNets: torch.nn.Module, label: int,
+                   Devign: torch.nn.Module, label: int,
                    target_id: int = -1, node_idx: Optional[int]=None,
                    undirected=True):
     """ return the fidelity score of the subgraph with top_k score edges  """
@@ -27,10 +27,10 @@ def top_k_fidelity(data: Data, edge_mask: np.array, top_k: int,
         top_k = 2 * top_k
     all_nodes = np.arange(data.x.shape[0]).tolist()
     selected_nodes = calculate_selected_nodes(data, edge_mask, top_k, node_idx)
-    score = gnn_score(all_nodes, data, gnnNets, label, target_id, node_idx=node_idx,
+    score = gnn_score(all_nodes, data, Devign, label, target_id, node_idx=node_idx,
                       subgraph_building_method='zero_filling')
     unimportant_nodes = [node for node in all_nodes if node not in selected_nodes]
-    score_mask_important = gnn_score(unimportant_nodes, data, gnnNets, label, target_id, node_idx=node_idx,
+    score_mask_important = gnn_score(unimportant_nodes, data, Devign, label, target_id, node_idx=node_idx,
                                      subgraph_building_method='zero_filling')
     return score - score_mask_important
 
@@ -66,7 +66,7 @@ def graph_build_split(X, edge_index, node_mask: np.array):
     return X, ret_edge_index
 
 
-def gnn_score(coalition: list, data: Data, gnnNets, label: int,
+def gnn_score(coalition: list, data: Data, Devign, label: int,
               target_id: int = -1, node_idx=None, subgraph_building_method='zero_filling') -> torch.Tensor:
     """ the prob of subgraph with selected nodes for required label and target node """
     num_nodes = data.num_nodes
@@ -74,9 +74,10 @@ def gnn_score(coalition: list, data: Data, gnnNets, label: int,
     mask = torch.zeros(num_nodes).type(torch.float32)
     mask[coalition] = 1.0
     ret_x, ret_edge_index = subgraph_build_func(data.x, data.edge_index, mask)
-    mask_data = Data(x=ret_x, edge_index=ret_edge_index)
-    mask_data = Batch.from_data_list([mask_data])
-    logits, probs, _ = gnnNets(mask_data)
+    #mask_data = Data(x=ret_x, edge_index=ret_edge_index)
+    #mask_data = Batch.from_data_list([mask_data])
+    mask_graph = type_conversion(ret_x, ret_edge_index, data.edge_attr)
+    logits, probs, _ = Devign(mask_graph)
 
     # get the score of predicted class for graph or specific node idx
     node_idx = 0 if node_idx is None else node_idx

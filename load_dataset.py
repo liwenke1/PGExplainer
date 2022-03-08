@@ -339,24 +339,16 @@ class Devign(InMemoryDataset):
 
     def process(self):
         data_list = []
-        
-        # json -> data_list
-        dataset_path=['/home/devign_out/devign_out_ff_novul/','/home/devign_out/devign_out_ff_vul/',
-                   '/home/devign_out/devign_out_qu_novul/','/home/devign_out/devign_out_qu_vul/']
+        with open('/home/DIG-main/dig/xgraph/GNNExplainer/benchmark/data/dataset_rec.txt','r') as f:
+            dataset_path = f.readlines()
+        i = 0
         for path in dataset_path:
-            dataset_list = glob.glob(path + '*.json')
-            random.shuffle(dataset_list)
-            i = 0
-            for data_name in dataset_list:
+            data = read_json(path.strip())
+            if(data.num_nodes >= 15):
+                data_list.append(data)
                 i += 1
-                if i>7:
+                if i > 7:
                     break
-                data = read_json(data_name)
-                if(data.num_nodes >= 15):
-                    data_list.append(data)
-                else:
-                    i -=1
-
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 

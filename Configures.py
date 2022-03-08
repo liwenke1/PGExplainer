@@ -22,7 +22,7 @@ class GATParser(Tap):           # hyper-parameter for gat model
 
 class ModelParser(GATParser):
     device_id: int = 0
-    model_name: str = 'gcn'
+    model_name: str = 'devign'
     checkpoint: str = './checkpoint'
     concate: bool = False                     # whether to concate the gnn features before mlp
     latent_dim: List[int] = [128, 128, 128]   # the hidden units for each gnn layer
@@ -33,7 +33,7 @@ class ModelParser(GATParser):
     adj_normlize: bool = True                 # the edge_weight normalization for gcn conv
     emb_normlize: bool = False                # the l2 normalization after gnn layer
     model_path: str = ""                      # default path to save the model
-    max_edge_types: int = 2                   # max edge type
+    max_edge_types: int = 4                   # max edge type
 
     def process_args(self) -> None:
         # self.device = torch.device('cpu')
@@ -52,7 +52,7 @@ class TrainParser(Tap):
     learning_rate: float = 0.005
     batch_size: int = 8
     weight_decay: float = 0.0
-    max_epochs: int = 800
+    max_epochs: int = 400
     save_epoch: int = 10
     early_stopping: int = 100
 

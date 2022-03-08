@@ -20,25 +20,11 @@ def pipeline_GC(top_k):
         data_indices = list(range(len(dataset)))
         pgexplainer_trainset = dataset
     else:
-        loader = get_dataloader(dataset,
-                                batch_size=train_args.batch_size,
-                                random_split_flag=data_args.random_split,
-                                data_split_ratio=data_args.data_split_ratio,
-                                seed=data_args.seed)
+        loader = get_dataloader(dataset, data_args, train_args)
         data_indices = loader['test'].dataset.indices
         pgexplainer_trainset = loader['train'].dataset
 
-    ''' load model 
-    input_dim = dataset.num_node_features
-    output_dim = dataset.num_classes
-    gnnNets = GnnNets(input_dim, output_dim, model_args)
-    checkpoint = torch.load(model_args.model_path)
-    gnnNets.update_state_dict(checkpoint['net'])
-    gnnNets.to_device()
-    gnnNets.eval()
-    '''
-
-    Devign = DevignModel(max_edge_types=model_args.max_edge_types)
+    Devign = DevignModel(model_args, max_edge_types=model_args.max_edge_types)
     config_model(Devign, model_args)
 
     save_dir = os.path.join('./results', f"{data_args.dataset_name}_"
@@ -71,14 +57,14 @@ def pipeline_GC(top_k):
             torch.cuda.synchronize()
         tic = time.perf_counter()
 
-        prob = pgexplainer.eval_probs(data.x, data.edge_index)
+        prob = pgexplainer.eval_probs(data.x, data.edge_index, data.edge_attr)
         pred_label = prob.argmax(-1).item()
 
         if glob.glob(os.path.join(save_dir, f"example_{data_idx}.pt")):
             file = glob.glob(os.path.join(save_dir, f"example_{data_idx}.pt"))[0]
             edge_mask = torch.from_numpy(torch.load(file))
         else:
-            edge_mask = pgexplainer.explain_edge_mask(data.x, data.edge_index)
+            edge_mask = pgexplainer.explain_edge_mask(data.x, data.edge_index, data.edge_attr)
             save_path = os.path.join(save_dir, f"example_{data_idx}.pt")
             edge_mask = edge_mask.cpu()
             torch.save(edge_mask.detach().numpy(), save_path)

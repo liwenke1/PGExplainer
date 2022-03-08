@@ -13,8 +13,9 @@ def config_model(model, args):
 
 
 class DevignModel(nn.Module):
-    def __init__(self, input_dim=100, output_dim=200, max_edge_types=2, num_steps=8):
+    def __init__(self, model_args, input_dim=100, output_dim=200, max_edge_types=4, num_steps=8):
         super(DevignModel, self).__init__()
+        self.device = model_args.device
         self.inp_dim = input_dim
         self.out_dim = output_dim
         self.max_edge_types = max_edge_types
@@ -31,6 +32,9 @@ class DevignModel(nn.Module):
         self.maxpool1_for_concat = torch.nn.MaxPool1d(3, stride=2)
         self.conv_l2_for_concat = torch.nn.Conv1d(self.concat_dim, self.concat_dim, 1)
         self.maxpool2_for_concat = torch.nn.MaxPool1d(2, stride=2)
+
+        self.batchnorm_1d = torch.nn.BatchNorm1d(output_dim)
+        self.batchnorm_1d_for_concat = torch.nn.BatchNorm1d(self.concat_dim)
 
         self.mlp_z = nn.Linear(in_features=self.concat_dim, out_features=2)
         self.mlp_y = nn.Linear(in_features=output_dim, out_features=2)
@@ -58,8 +62,8 @@ class DevignModel(nn.Module):
         pass
 
     def forward(self, batch, cuda=False):
-        graph, features, batch = batch.x, batch.edge_index, batch.batch
-        #graph, features, edge_types = self.get_network_inputs(batch, cuda=cuda)
+        #graph, features, edge_types, batch = batch.x, batch.edge_index, batch.edge_attr, batch.batch
+        graph, features, edge_types = self.get_network_inputs(batch, cuda=cuda)
         graph = graph.to(torch.device("cuda:0"))
         features = features.to(torch.device("cuda:0"))
         edge_types = edge_types.to(torch.device("cuda:0"))
@@ -70,22 +74,30 @@ class DevignModel(nn.Module):
         batch_size, num_node, _ = c_i.size()
         Y_1 = self.maxpool1(
             F.relu(
-                self.conv_l1(h_i.transpose(1, 2))
+                self.batchnorm_1d(
+                    self.conv_l1(h_i.transpose(1, 2))  # num_node >= 5
+                )
             )
         )
         Y_2 = self.maxpool2(
             F.relu(
-                self.conv_l2(Y_1)
+                self.batchnorm_1d(
+                    self.conv_l2(Y_1)
+                )
             )
         ).transpose(1, 2)
         Z_1 = self.maxpool1_for_concat(
             F.relu(
-                self.conv_l1_for_concat(c_i.transpose(1, 2))
+                self.batchnorm_1d_for_concat(
+                    self.conv_l1_for_concat(c_i.transpose(1, 2))
+                )
             )
         )
         Z_2 = self.maxpool2_for_concat(
             F.relu(
-                self.conv_l2_for_concat(Z_1)
+                self.batchnorm_1d_for_concat(
+                    self.conv_l2_for_concat(Z_1)
+                )
             )
         ).transpose(1, 2)
         before_avg = torch.mul(self.mlp_y(Y_2), self.mlp_z(Z_2))
