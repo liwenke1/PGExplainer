@@ -1,8 +1,10 @@
 # PGExplainer
 
+This repository is modified by [DIG]()
+
 This repository is a PyTorch and 
 PyTorch Geometric implementation of Paper 
-[Parameterized Explainer for Graph Neural Network](https://arxiv.org/abs/2011.04573).
+[Parameterized Explainer for Graph Neural Network](https://github.com/divelab/DIG/tree/main/dig/xgraph/PGExplainer).
 
 
 The [official implementation](https://github.com/flyingdoog/PGExplainer) is based on TensorFlow.
