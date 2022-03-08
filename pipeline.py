@@ -93,6 +93,7 @@ def pipeline_GC(top_k):
         else:
             plotutils.plot_soft_edge_mask(graph, edge_mask, top_k,
                                           x=data.x,
+                                          edge_index=data.edge_index,
                                           un_directed=True,
                                           figname=os.path.join(save_dir, f"example_{data_idx}.png"))
 

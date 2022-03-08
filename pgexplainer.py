@@ -237,11 +237,9 @@ class PGExplainer(nn.Module):
         return outputs[1].squeeze()
 
     def explain_edge_mask(self, x, edge_index, edge_attr, **kwargs):
-        data = Batch.from_data_list([Data(x=x, edge_index=edge_index, edge_attr=edge_attr)])
-        data = data.to(self.device)
         with torch.no_grad():
-            _, prob, emb = self.get_model_output(data.x, data.edge_index, data.edge_attr)
-            _, edge_mask = self.forward((data.x, emb, data.edge_index, 1.0, data.edge_attr), training=False)
+            _, prob, emb = self.get_model_output(x, edge_index, edge_attr)
+            _, edge_mask = self.forward((x, emb, edge_index, 1.0, edge_attr), training=False)
         return edge_mask
 
     def get_subgraph(self, node_idx, x, edge_index, y, **kwargs):

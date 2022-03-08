@@ -267,14 +267,13 @@ class PlotUtils():
         nodelist = list(set(nodelist))
         return nodelist, edgelist
 
-    def plot_soft_edge_mask(self, graph, edge_mask, top_k, un_directed, figname, **kwargs):
-        edge_index = torch.FloatTensor(list(graph.edges())).T #将list ,numpy转化为tensor
-        edge_mask = torch.FloatTensor(edge_mask)#将list ,numpy转化为tensor
-        if self.dataset_name.lower() == 'BA_2motifs'.lower():
+    def plot_soft_edge_mask(self, graph, edge_mask, top_k, edge_index, un_directed, figname, **kwargs):
+        edge_mask = torch.FloatTensor(edge_mask)
+        if self.dataset_name.lower() in ['BA_2motifs'.lower(), 'devign'] :
             nodelist, edgelist = self.get_topk_edges_subgraph(edge_index, edge_mask, top_k, un_directed)
             self.plot_ba2motifs(graph, nodelist, edgelist, figname=figname)
 
-        elif self.dataset_name.lower() in ['bbbp', 'mutag', 'devign']:
+        elif self.dataset_name.lower() in ['bbbp', 'mutag']:
             x = kwargs.get('x')
             nodelist, edgelist = self.get_topk_edges_subgraph(edge_index, edge_mask, top_k, un_directed)
             self.plot_molecule(graph, nodelist, x, edgelist, figname=figname)
