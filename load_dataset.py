@@ -59,7 +59,7 @@ def read_json(filename):
     y.append([file['target']])
     y=torch.tensor(y)
     
-    data=Data(x=x,edge_index=edge_index,edge_attr=edge_attr,y=y)
+    data=Data(x=x,edge_index=edge_index,edge_attr=edge_attr,y=y,name=filename)
     #torch.save(data,filename+'.pt')
     return data
 
